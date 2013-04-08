@@ -2,6 +2,7 @@ msaccess-table-optimizer
 ========================
 
 Brendan Kidwell
+
 17 December 2007
 
 This module is a quick and dirty procedure for optimizing the sizes of Text fields in Access. One important use for this module would be cleaning up tables imported from external sources where Access defaults to very large field sizes.
