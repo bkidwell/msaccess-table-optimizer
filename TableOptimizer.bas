@@ -67,30 +67,48 @@
 ' TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 ' SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
- 
- 
+
+
 Option Compare Database
 Option Explicit
- 
-Public Sub MakeReport()
- 
-Dim target As String, f As DAO.Field, t As DAO.TableDef
-Dim rs1 As DAO.Recordset, rs2 As DAO.Recordset
+
+Public Sub OptimizeAllTables()
+
+Dim t As TableDef
+
+For Each t In CurrentDb.TableDefs
+    If (t.Name <> "_TableOptimizer") And (Left(t.Name, 4) <> "MSys") Then
+        Debug.Print "-- Analyzing " & t.Name
+        MakeReport t.Name
+        CurrentDb.Execute "update _TableOptimizer set New_Size = Longest_Value where [Table] = '" & _
+            Replace(t.Name, "'", "''") & "' and Type = 'Text'", dao.dbFailOnError
+        Debug.Print "-- Optimizing " & t.Name
+        ChangeSizes t.Name
+    End If
+Next
+Debug.Print "-- Done"
+
+End Sub
+
+Public Sub MakeReport(Optional target As String)
+
+Dim f As dao.Field, t As dao.TableDef
+Dim rs1 As dao.Recordset, rs2 As dao.Recordset
 Dim i As Long, sql1 As String, typeName As String, size As Variant
 Dim sql2 As String, fieldName As String
- 
+
 On Error Resume Next
 CurrentDb.Execute _
     "create table _TableOptimizer " & _
     "([Table] Text (50), [Field_Num] Integer, [Field] Text (50), " & _
     "[Type] Text (20), Size Long, New_Size Long, Shortest_Value Long, Longest_Value Long)"
 On Error GoTo 0
- 
-target = InputBox("Which table", "TableOptimizer: MakeReport()", "")
+
+If target = "" Then target = InputBox("Which table", "TableOptimizer: MakeReport()", "")
 If target = "" Then Exit Sub
- 
+
 CurrentDb.Execute "delete from _TableOptimizer where [Table]=""" & target & """"
- 
+
 Set rs1 = CurrentDb.OpenRecordset(target)
 sql1 = "select 0 as x"
 i = 0
@@ -99,14 +117,14 @@ For Each f In rs1.Fields
     size = f.size
     typeName = FieldTypeName(f)
     If typeName = "Memo" Then size = "null"
- 
+
     sql2 = _
         "insert into _TableOptimizer " & _
         "([Table], [Field_Num], [Field], [Type], [Size]) " & _
         "values (""" & target & """, " & i & ", """ & f.Name & """, " & _
         """" & typeName & """, " & size & ")"
     CurrentDb.Execute sql2
- 
+
     Select Case typeName
     Case "Text", "Memo"
         sql1 = sql1 & _
@@ -115,16 +133,16 @@ For Each f In rs1.Fields
     End Select
 Next
 rs1.Close
- 
-sql1 = sql1 & "from [" & target & "]"
+
+sql1 = sql1 & " from [" & target & "]"
 Set rs1 = CurrentDb.OpenRecordset(sql1)
 rs1.MoveFirst
- 
+
 Set rs2 = CurrentDb.OpenRecordset( _
     "select * from _TableOptimizer where [Table]=""" & target & """ " & _
     "order by Field_Num" _
 )
- 
+
 rs2.MoveFirst
 Do Until rs2.EOF
     typeName = rs2("Type").Value
@@ -139,23 +157,23 @@ Do Until rs2.EOF
     End Select
     rs2.MoveNext
 Loop
- 
+
 rs2.Close
 rs1.Close
- 
+
 End Sub
- 
-Public Sub ChangeSizes()
- 
-Dim target As String, rs As DAO.Recordset, sql
- 
-target = InputBox("Which table", "TableOptimizer: ChangeSizes()", "")
+
+Public Sub ChangeSizes(Optional target As String)
+
+Dim rs As dao.Recordset, sql
+
+If target = "" Then target = InputBox("Which table", "TableOptimizer: ChangeSizes()", "")
 If target = "" Then Exit Sub
- 
+
 Set rs = CurrentDb.OpenRecordset( _
     "select * from _TableOptimizer where [table]=""" & target & """" _
 )
- 
+
 rs.MoveFirst
 Do Until rs.EOF
     Debug.Print rs("type").Value, rs("new_size").Value
@@ -168,14 +186,14 @@ Do Until rs.EOF
     rs.MoveNext
 Loop
 rs.Close
- 
+
 End Sub
- 
+
 ' FieldTypeName
 ' by Allen Browne, allen@allenbrowne.com. Updated June 2006.
 ' copied from http://allenbrowne.com/func-06.html
 ' (No license information found at that URL.)
-Function FieldTypeName(fld As DAO.Field) As String
+Function FieldTypeName(fld As dao.Field) As String
     'Purpose: Converts the numeric results of DAO Field.Type to text.
     Dim strReturn As String    'Name to return
 
@@ -231,7 +249,6 @@ Function FieldTypeName(fld As DAO.Field) As String
         Case 109&: strReturn = "Complex Text"       'dbComplexText
         Case Else: strReturn = "Field type " & fld.Type & " unknown"
     End Select
- 
+
     FieldTypeName = strReturn
 End Function
-
